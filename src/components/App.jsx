@@ -1,4 +1,4 @@
-import React, { Component } from 'react';
+import { useState, useEffect } from 'react';
 import { Contacts } from './Contacts/Contacts';
 import { ContactForm } from './Form/Form';
 import { Filter } from './Filter/Filter';
@@ -9,77 +9,58 @@ import {
   ContactsWrapper,
 } from 'components/App.styled';
 import { customAlphabet } from 'nanoid';
+import { initialContacts } from 'data/initialContacts';
+import { useLocalStorage } from 'hooks/useLocalStorage';
 
-export class App extends Component {
-  state = {
-    contacts: [
-      { id: 'id-1', name: 'Rosie Simpson', number: '459-12-56' },
-      { id: 'id-2', name: 'Hermione Kline', number: '443-89-12' },
-      { id: 'id-3', name: 'Eden Clements', number: '645-17-79' },
-      { id: 'id-4', name: 'Annie Copeland', number: '227-91-26' },
-    ],
-    filter: '',
+const LS_KEY = 'contacts';
+const nanoid = customAlphabet('1234567890', 3);
+const id = 'id-' + nanoid();
+
+export const App = () => {
+  const [contacts, setContacts] = useLocalStorage(LS_KEY, initialContacts);
+  const [filter, setFilter] = useState('');
+
+  useEffect(
+    () => localStorage.setItem(LS_KEY, JSON.stringify(contacts)),
+    [contacts]
+  );
+
+  const handleSubmit = newContact => {
+    setContacts(prevContacts => {
+      if (prevContacts.find(contact => contact.name === newContact.name)) {
+        Notify.warning(`${newContact.name} is already in contact`);
+        return prevContacts;
+      }
+      newContact.id = id;
+      return [newContact, ...prevContacts];
+    });
   };
 
-  handleSubmit = data => {
-    const nanoid = customAlphabet('1234567890', 3);
-    const id = 'id-' + nanoid();
-    data = { id, ...data };
-    console.log(data);
-    this.setState(({ contacts }) =>
-      contacts.find(contact => contact.name === data.name)
-        ? Notify.warning(`${data.name} is already in contact`)
-        : { contacts: [data, ...contacts] }
+  const handleFilter = evt => {
+    setFilter(evt.currentTarget.value);
+  };
+
+  const handleDeleteContact = contactId => {
+    setContacts(prevContacts =>
+      prevContacts.filter(contact => contact.id !== contactId)
     );
   };
 
-  handleFilter = evt => {
-    const { value } = evt.currentTarget;
-    this.setState({ filter: value });
-  };
+  const filteredContacts = contacts.filter(contact =>
+    contact.name.toLowerCase().includes(filter.toLowerCase())
+  );
 
-  handleDeleteContact = contactId => {
-    this.setState(prevState => ({
-      contacts: prevState.contacts.filter(contact => contact.id !== contactId),
-    }));
-  };
-
-  handleFilteredContacts = contacts => {
-    return contacts.filter(contact =>
-      contact.name.toLowerCase().includes(this.state.filter.toLowerCase())
-    );
-  };
-
-  componentDidMount() {
-    const contacts = localStorage.getItem('contacts');
-    const parsedContacts = JSON.parse(contacts);
-    if (parsedContacts) {
-      this.setState({ contacts: parsedContacts });
-    }
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    if (this.state.contacts !== prevState.contacts) {
-      localStorage.setItem('contacts', JSON.stringify(this.state.contacts));
-    }
-  }
-
-  render() {
-    const { contacts, filter } = this.state;
-    const filteredContacts = this.handleFilteredContacts(contacts);
-
-    return (
-      <PhoneBook>
-        <ContactForm onSubmit={this.handleSubmit}></ContactForm>
-        <ContactsWrapper>
-          <ContactsTitle>Contacts</ContactsTitle>
-          <Filter value={filter} onFilter={this.handleFilter} />
-          <Contacts
-            contacts={filteredContacts}
-            onDeleteContact={this.handleDeleteContact}
-          />
-        </ContactsWrapper>
-      </PhoneBook>
-    );
-  }
-}
+  return (
+    <PhoneBook>
+      <ContactForm onSubmit={handleSubmit}></ContactForm>
+      <ContactsWrapper>
+        <ContactsTitle>Contacts</ContactsTitle>
+        <Filter value={filter} onFilter={handleFilter} />
+        <Contacts
+          contacts={filteredContacts}
+          onDeleteContact={handleDeleteContact}
+        />
+      </ContactsWrapper>
+    </PhoneBook>
+  );
+};
